@@ -34,7 +34,7 @@ jobs:
       
       - name: Run kubebuilder alpha update
         run: |
-          kubebuilder alpha update --from-version v4.5.2 --force
+          kubebuilder alpha update --force
       
       - name: Restore workflows directory
         run: |
