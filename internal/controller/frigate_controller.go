@@ -19,11 +19,10 @@ package controller
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	log "sigs.k8s.io/controller-runtime/pkg/log"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	shipv1beta1 "github.com/vitorfloriano/test-operator-4-5-2/api/v1beta1"
 )
@@ -48,20 +47,9 @@ type FrigateReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.4/pkg/reconcile
 func (r *FrigateReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := log.FromContext(ctx)
+	_ = logf.FromContext(ctx)
 
-	frigate := &examplecomv1.Frigate{}
-	err := r.Get(ctx, req.NamespacedName, frigate)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			log.Info("wordpress resource not found. Ignoring since object must be deleted")
-			return ctrl.Result{}, nil
-		}
-		log.Error(err, "Failed to get wordpress")
-		return ctrl.Result{}, err
-	}
-
-	log.Info("frigate reconciled")
+	// TODO(user): your logic here
 
 	return ctrl.Result{}, nil
 }
