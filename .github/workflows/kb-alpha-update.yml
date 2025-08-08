@@ -12,6 +12,8 @@ on:
 jobs:
     alpha-update:
       runs-on: ubuntu-latest
+      env:
+        BRANCH_NAME: kubebuilder-alpha-update-${{ github.run_number }}
 
       steps:
       - name: Checkout repository
@@ -19,6 +21,22 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: Install Kubebuilder
+        run: |
+          curl -L -o kubebuilder "https://go.kubebuilder.io/dl/latest/$(go env GOOS)/$(go env GOARCH)"
+          chmod +x kubebuilder
+          sudo mv kubebuilder /usr/local/bin/
+      
+      - name: Configure Git
+        run: |
+          git config --local user.name "user"
+          git config --local user.email "user@users.noreply.github.com"
 
       - name: Extract current version from cliVersion field in the PROJECT config file
         id: current-version
@@ -57,6 +75,18 @@ jobs:
             echo "update_needed=false" >> $GITHUB_OUTPUT
             echo "Already using latest version"
           fi
+      
+      - name: Run kubebuilder alpha update
+        run: |
+          kubebuilder alpha update --from-version v4.5.2 --force
+            
+      - name: Soft reset last 4 commits and checkout main
+        run: |
+          git reset --soft HEAD~4
+          git checkout -b ${{ env.BRANCH_NAME }}
+          git add .
+          git commit -m "Kubebuilder alpha update"
+          git push -u origin ${{ env.BRANCH_NAME }}
 
       - name: Prepare issue content
         id: prepare-issue
@@ -118,6 +148,8 @@ jobs:
           kubebuilder alpha update
           \`\`\`
           
+          Or create a PR with the changes: https://github.com/${{ github.repository }}/pull/new/${{ env.BRANCH_NAME }}
+
           This command will update the project by performing a three-way git merge.
           
           ### Important Notes
