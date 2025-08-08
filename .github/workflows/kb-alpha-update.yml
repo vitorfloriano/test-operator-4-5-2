@@ -141,7 +141,7 @@ jobs:
         if: steps.version-check.outputs.update_needed == 'true'
         run: |
           # Check if an issue with similar title already exists
-          existing_issue=$(gh issue list --search "Update Kubebuilder from v" --state open --json number,title | jq -r '.[] | select(.title | contains("Update Kubebuilder")) | .number' | head -1)
+          existing_issue=$(gh issue list --search "Update Kubebuilder" --state open --json number,title | jq -r '.[] | select(.title | contains("Update Kubebuilder")) | .number' | head -1)
           
           if [ -n "$existing_issue" ]; then
             echo "issue_exists=true" >> $GITHUB_OUTPUT
