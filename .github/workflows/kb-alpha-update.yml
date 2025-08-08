@@ -37,15 +37,26 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
       
-      - name: Run kubebuilder alpha update
+      - name: Run kubebuilder alpha update (capture versions)
         run: |
-          kubebuilder alpha update --from-version v4.5.2 --force
+          set -e
+          kubebuilder alpha update --force 2>&1 | tee kb-update.log
+          line="$(grep -E 'Merge from v[0-9]+\.[0-9]+\.[0-9]+ to v[0-9]+\.[0-9]+\.[0-9]+' kb-update.log | tail -n1 || true)"
+          if [ -n "$line" ]; then
+            FROM_VER="$(echo "$line" | sed -n 's/.*Merge from \(v[0-9.]*\) to \(v[0-9.]*\).*/\1/p')"
+            TO_VER="$(echo  "$line" | sed -n 's/.*Merge from \(v[0-9.]*\) to \(v[0-9.]*\).*/\2/p')"
+          fi
+          : "${FROM_VER:=unknown}"
+          : "${TO_VER:=unknown}"
+          echo "PR_FROM_VERSION=$FROM_VER" >> "$GITHUB_ENV"
+          echo "PR_TO_VERSION=$TO_VER" >> "$GITHUB_ENV"
+          echo "Detected versions: $FROM_VER -> $TO_VER"
       
       - name: Restore workflows directory
         run: |
           git restore --source=main --staged --worktree .github/workflows
           git add .github/workflows
-          git commit --amend --no-edit 
+          git commit --amend --no-edit || true
       
       - name: Soft reset last 4 commits and checkout main
         run: |
@@ -56,8 +67,11 @@ jobs:
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore: update Kubebuilder scaffolding"
-          title: "chore: update Kubebuilder scaffolding"
-          body: "Automated update of Kubebuilder project scaffolding to latest version."
+          commit-message: "chore: update Kubebuilder scaffolding ${ { env.PR_FROM_VERSION } } -> ${ { env.PR_TO_VERSION } }"
+          title: "chore: update Kubebuilder scaffolding ${{ env.PR_FROM_VERSION }} → ${{ env.PR_TO_VERSION }}"
+          body: |
+            Automated Kubebuilder scaffolding update.
+            From: ${{ env.PR_FROM_VERSION }}
+            To:   ${{ env.PR_TO_VERSION }}
           branch: kubebuilder-alpha-update
           delete-branch: true
