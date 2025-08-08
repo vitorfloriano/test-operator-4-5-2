@@ -34,8 +34,8 @@ jobs:
       
       - name: Configure Git
         run: |
-          git config --local user.name "github-actions[bot]"
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "user"
+          git config --local user.email "user@users.noreply.github.com"
       
       - name: Run kubebuilder alpha update
         run: |
@@ -63,17 +63,8 @@ jobs:
           git add .github/workflows
           git commit --amend --no-edit || true
       
-      - name: Soft reset last 4 commits and checkout main
-        run: |
-          git reset --soft HEAD~4
-          git checkout main
-      
       - name: Push changes and create Pull Request
         run: |
-          # Create and push branch
-          git checkout -b kubebuilder-alpha-update
-          git push origin kubebuilder-alpha-update --force
-          
           # Create PR using GitHub API
           gh api \
             --method POST \
