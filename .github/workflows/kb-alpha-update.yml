@@ -40,7 +40,7 @@ jobs:
       - name: Run kubebuilder alpha update
         run: |
           set -e
-          kubebuilder alpha update --force
+          kubebuilder alpha update --from-version v4.5.2 --force
       
       - name: Extract versions from commit message
         run: |
@@ -72,8 +72,8 @@ jobs:
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore: update Kubebuilder scaffolding ${ { env.PR_FROM_VERSION } } -> ${ { env.PR_TO_VERSION } }"
-          title: "chore: update Kubebuilder scaffolding ${{ env.PR_FROM_VERSION }} → ${{ env.PR_TO_VERSION }}"
+          commit-message: "chore: update Kubebuilder scaffolding from ${ { env.PR_FROM_VERSION } } to ${ { env.PR_TO_VERSION } }"
+          title: "chore: update Kubebuilder from ${{ env.PR_FROM_VERSION }} to ${{ env.PR_TO_VERSION }}"
           body: |
             Automated Kubebuilder scaffolding update.
             From: ${{ env.PR_FROM_VERSION }}
