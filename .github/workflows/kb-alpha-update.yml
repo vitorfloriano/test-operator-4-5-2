@@ -2,8 +2,6 @@ name: Alpha Update
 
 permissions:
     contents: write
-    pull-requests: write
-    actions: write
     issues: write
 
 on:
@@ -27,7 +25,8 @@ jobs:
         run: |
           if [ -f "PROJECT" ]; then
             # Extract cliVersion from PROJECT file
-            current_version=$(grep "cliVersion:" PROJECT | awk '{print $2}' | tr -d '"' | tr -d "'")
+            current_version=$(grep "cliVersion:" PROJECT | awk '{print $2}')
+            
             echo "current_version=$current_version" >> $GITHUB_OUTPUT
             echo "Current Kubebuilder version: $current_version"
           else
@@ -35,7 +34,7 @@ jobs:
             exit 1
           fi
 
-      - name: Fetch latest kubebuilder version from GitHub releases
+      - name: Fetch latest Kubebuilder version from GitHub releases
         id: latest-version
         run: |
           # Get latest release version from GitHub API
@@ -65,7 +64,7 @@ jobs:
         run: |
           # Check if an issue with similar title already exists
           issue_title="Update Kubebuilder from v${{ steps.current-version.outputs.current_version }} to v${{ steps.latest-version.outputs.latest_version }}"
-          existing_issue=$(gh issue list --search "Update Kubebuilder" --state open --json number,title | jq -r '.[] | select(.title | contains("Update Kubebuilder")) | .number' | head -1)
+          existing_issue=$(gh issue list --search "Update Kubebuilder from v" --state open --json number,title | jq -r '.[] | select(.title | contains("Update Kubebuilder")) | .number' | head -1)
           
           if [ -n "$existing_issue" ]; then
             echo "issue_exists=true" >> $GITHUB_OUTPUT
@@ -88,28 +87,16 @@ jobs:
           cat > issue_body.md << EOF
           ## Kubebuilder Version Update Available
           
-          A new version of Kubebuilder is available and should be updated.
+          A new version of Kubebuilder is available for update.
           
           ### Version Information
           - **Current Version**: v$current_version
           - **Latest Version**: v$latest_version
           
           ### Update Steps
-          1. Update the \`cliVersion\` field in the \`PROJECT\` file
-          2. Run \`make manifests\` to regenerate manifests if needed
-          3. Update any version-specific documentation
-          4. Test the operator with the new Kubebuilder version
-          5. Update CI/CD pipelines if necessary
           
           ### Release Notes
           Check the [Kubebuilder releases page](https://github.com/kubernetes-sigs/kubebuilder/releases/tag/v$latest_version) for detailed release notes and breaking changes.
-          
-          ### Checklist
-          - [ ] Update PROJECT file
-          - [ ] Regenerate manifests
-          - [ ] Update documentation
-          - [ ] Test operator functionality
-          - [ ] Update CI/CD if needed
           
           ---
           *This issue was automatically created by the Alpha Update workflow.*
@@ -141,22 +128,8 @@ jobs:
           - **Current Version**: v$current_version
           - **Latest Version**: v$latest_version
           
-          ### Update Steps
-          1. Update the \`cliVersion\` field in the \`PROJECT\` file
-          2. Run \`make manifests\` to regenerate manifests if needed
-          3. Update any version-specific documentation
-          4. Test the operator with the new Kubebuilder version
-          5. Update CI/CD pipelines if necessary
-          
           ### Release Notes
           Check the [Kubebuilder releases page](https://github.com/kubernetes-sigs/kubebuilder/releases/tag/v$latest_version) for detailed release notes and breaking changes.
-          
-          ### Checklist
-          - [ ] Update PROJECT file
-          - [ ] Regenerate manifests
-          - [ ] Update documentation
-          - [ ] Test operator functionality
-          - [ ] Update CI/CD if needed
           
           ---
           *This issue was automatically created by the Alpha Update workflow.*
