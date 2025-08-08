@@ -37,30 +37,21 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
       
-      - name: Run kubebuilder alpha update (capture versions)
+      - name: Run kubebuilder alpha update
         run: |
           set -e
-          kubebuilder alpha update --force 2>&1 | tee kb-update.log
+          kubebuilder alpha update --force
+      
+      - name: Extract versions from commit message
+        run: |
+          # Get the last commit message (kubebuilder's final commit)
+          COMMIT_MSG=$(git log -1 --pretty=format:"%s")
+          echo "Final commit message: $COMMIT_MSG"
           
-          # Debug: show the log to see what we're working with
-          echo "=== Update log ==="
-          cat kb-update.log
-          echo "=== End log ==="
-          
-          # Look for the merge line with more flexible patterns
-          line="$(grep -iE '(merge from|from.*to).*v[0-9]+\.[0-9]+\.[0-9]+.*v[0-9]+\.[0-9]+\.[0-9]+' kb-update.log | tail -n1 || true)"
-          
-          if [ -n "$line" ]; then
-            echo "Found version line: $line"
-            # Extract all version patterns and take first two
-            versions=($(echo "$line" | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+'))
-            FROM_VER="${versions[0]:-unknown}"
-            TO_VER="${versions[1]:-unknown}"
-          else
-            FROM_VER="unknown"
-            TO_VER="unknown"
-            echo "No version line found in log"
-          fi
+          # Extract versions from commit message
+          versions=($(echo "$COMMIT_MSG" | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+'))
+          FROM_VER="${versions[0]:-unknown}"
+          TO_VER="${versions[1]:-unknown}"
           
           echo "PR_FROM_VERSION=$FROM_VER" >> "$GITHUB_ENV"
           echo "PR_TO_VERSION=$TO_VER" >> "$GITHUB_ENV"
