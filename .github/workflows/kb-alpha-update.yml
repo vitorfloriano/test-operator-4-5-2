@@ -1,5 +1,10 @@
 name: Alpha Update
 
+permissions:
+    contents: write
+    pull-requests: write
+    actions: write
+
 on:
   workflow_dispatch:
   schedule:
@@ -32,29 +37,55 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
       
-      - name: Run kubebuilder alpha update
+      - name: Run kubebuilder alpha update (capture versions)
         run: |
-          kubebuilder alpha update --from-version v4.5.2 --force
+          set -e
+          kubebuilder alpha update --force 2>&1 | tee kb-update.log
+          
+          # Debug: show the log to see what we're working with
+          echo "=== Update log ==="
+          cat kb-update.log
+          echo "=== End log ==="
+          
+          # Look for the merge line with more flexible patterns
+          line="$(grep -iE '(merge from|from.*to).*v[0-9]+\.[0-9]+\.[0-9]+.*v[0-9]+\.[0-9]+\.[0-9]+' kb-update.log | tail -n1 || true)"
+          
+          if [ -n "$line" ]; then
+            echo "Found version line: $line"
+            # Extract all version patterns and take first two
+            versions=($(echo "$line" | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+'))
+            FROM_VER="${versions[0]:-unknown}"
+            TO_VER="${versions[1]:-unknown}"
+          else
+            FROM_VER="unknown"
+            TO_VER="unknown"
+            echo "No version line found in log"
+          fi
+          
+          echo "PR_FROM_VERSION=$FROM_VER" >> "$GITHUB_ENV"
+          echo "PR_TO_VERSION=$TO_VER" >> "$GITHUB_ENV"
+          echo "Detected versions: $FROM_VER -> $TO_VER"
       
       - name: Restore workflows directory
         run: |
           git restore --source=main --staged --worktree .github/workflows
           git add .github/workflows
-          git commit --amend --no-edit 
+          git commit --amend --no-edit || true
       
-      - name: Check commit history
+      - name: Soft reset last 4 commits and checkout main
         run: |
-          git status
-          git log --all --oneline
+          git reset --soft HEAD~4
+          git checkout main
       
-      - name: Detect merge branch and create PR
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          PR_BRANCH=$(git branch --show-current) 
-          git push origin "$PR_BRANCH"
-          gh pr create \
-            --title "chore: update Kubebuilder scaffolding" \
-            --body "Automated update of Kubebuilder project scaffolding to latest version." \
-            --base main \
-            --head "$PR_BRANCH"
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: update Kubebuilder scaffolding ${ { env.PR_FROM_VERSION } } -> ${ { env.PR_TO_VERSION } }"
+          title: "chore: update Kubebuilder scaffolding ${{ env.PR_FROM_VERSION }} → ${{ env.PR_TO_VERSION }}"
+          body: |
+            Automated Kubebuilder scaffolding update.
+            From: ${{ env.PR_FROM_VERSION }}
+            To:   ${{ env.PR_TO_VERSION }}
+          branch: kubebuilder-alpha-update
+          delete-branch: true

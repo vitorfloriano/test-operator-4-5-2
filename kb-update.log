@@ -1,0 +1,18 @@
+level=warning msg="No --from-branch specified, using 'main' as default"
+level=info msg="Checking if is a git repository"
+level=info msg="Checking if branch has uncommitted changes"
+Error: failed to validate git repository: working directory has uncommitted changes. Please commit or stash them before updating
+Usage:
+  kubebuilder alpha update [flags]
+
+Flags:
+      --force                 Force the update even if conflicts occur. Conflicted files will include conflict markers, and a commit will be created automatically. Ideal for automation (e.g., cronjobs, CI).
+      --from-branch string    Git branch to use as current state of the project for the update.
+      --from-version string   binary release version to upgrade from. Should match the version used to init the project and bea valid release version, e.g., v4.6.0. If not set, it defaults to the version specified in the PROJECT file. 
+  -h, --help                  help for update
+      --to-version string     binary release version to upgrade to. Should be a valid release version, e.g., v4.7.0. If not set, it defaults to the latest release version available in the project repository.
+
+Global Flags:
+      --plugins strings   plugin keys to be used for this subcommand execution
+
+level=fatal msg="error executing command: failed to validate git repository: working directory has uncommitted changes. Please commit or stash them before updating"
