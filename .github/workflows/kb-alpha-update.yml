@@ -119,8 +119,6 @@ jobs:
           gh issue create \
             --title "Update Kubebuilder from v$current_version to v$latest_version" \
             --body-file issue_body.md \
-            --label "enhancement,dependencies" \
-            --assignee "${{ github.actor }}"
           
           echo "Issue created successfully"
         env:
