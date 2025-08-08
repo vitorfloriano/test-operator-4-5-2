@@ -42,9 +42,9 @@ jobs:
           set -e
           kubebuilder alpha update --from-version v4.5.2 --force
       
-      - name: Extract versions from commit message
+      - name: Extract versions from merge commit
         run: |
-          # Get the last commit message (kubebuilder's final commit)
+          # Get the last commit message (alpha update final commit)
           COMMIT_MSG=$(git log -1 --pretty=format:"%s")
           echo "Final commit message: $COMMIT_MSG"
           
@@ -72,11 +72,10 @@ jobs:
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore: update Kubebuilder scaffolding from ${ { env.PR_FROM_VERSION } } to ${ { env.PR_TO_VERSION } }"
-          title: "chore: update Kubebuilder from ${{ env.PR_FROM_VERSION }} to ${{ env.PR_TO_VERSION }}"
+          commit-message: "chore: update Kubebuilder scaffolding from ${{ env.PR_FROM_VERSION }} to ${{ env.PR_TO_VERSION }}"
+          title: "chore: update Kubebuilder scaffolding from ${{ env.PR_FROM_VERSION }} to ${{ env.PR_TO_VERSION }}"
           body: |
-            Automated Kubebuilder scaffolding update.
-            From: ${{ env.PR_FROM_VERSION }}
-            To:   ${{ env.PR_TO_VERSION }}
+            Automated Kubebuilder scaffolding update from ${{ env.PR_FROM_VERSION }} to ${{ env.PR_TO_VERSION }}.
+            Please review the changes. 
           branch: kubebuilder-alpha-update
           delete-branch: true
