@@ -131,9 +131,42 @@ jobs:
           latest_version="${{ steps.latest-version.outputs.latest_version }}"
           issue_number="${{ steps.check-issue.outputs.existing_issue_number }}"
           
-          # Add comment to existing issue
-          gh issue comment $issue_number --body "🔄 **Update**: New Kubebuilder version v$latest_version is now available (previously detected v$current_version)."
+          # Create updated issue body
+          cat > updated_issue_body.md << EOF
+          ## Kubebuilder Version Update Available
           
-          echo "Updated existing issue #$issue_number"
+          A new version of Kubebuilder is available and should be updated.
+          
+          ### Version Information
+          - **Current Version**: v$current_version
+          - **Latest Version**: v$latest_version
+          
+          ### Update Steps
+          1. Update the \`cliVersion\` field in the \`PROJECT\` file
+          2. Run \`make manifests\` to regenerate manifests if needed
+          3. Update any version-specific documentation
+          4. Test the operator with the new Kubebuilder version
+          5. Update CI/CD pipelines if necessary
+          
+          ### Release Notes
+          Check the [Kubebuilder releases page](https://github.com/kubernetes-sigs/kubebuilder/releases/tag/v$latest_version) for detailed release notes and breaking changes.
+          
+          ### Checklist
+          - [ ] Update PROJECT file
+          - [ ] Regenerate manifests
+          - [ ] Update documentation
+          - [ ] Test operator functionality
+          - [ ] Update CI/CD if needed
+          
+          ---
+          *This issue was automatically created by the Alpha Update workflow.*
+          EOF
+          
+          # Update the issue title and body
+          gh issue edit $issue_number \
+            --title "Update Kubebuilder from v$current_version to v$latest_version" \
+            --body-file updated_issue_body.md
+          
+          echo "Updated existing issue #$issue_number with new title and description"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
