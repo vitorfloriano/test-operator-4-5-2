@@ -4,6 +4,7 @@ permissions:
     contents: write
     pull-requests: write
     actions: write
+    issues: write
 
 on:
   workflow_dispatch:
@@ -56,24 +57,16 @@ jobs:
           echo "PR_FROM_VERSION=$FROM_VER" >> "$GITHUB_ENV"
           echo "PR_TO_VERSION=$TO_VER" >> "$GITHUB_ENV"
           echo "Detected versions: $FROM_VER -> $TO_VER"
-      
-      - name: Restore workflows directory
-        run: |
-          git restore --source=main --staged --worktree .github/workflows
-          git add .github/workflows
-          git commit --amend --no-edit || true
-      
-      - name: Push changes and create Pull Request
-        run: |
-          # Create PR using GitHub API
-          gh api \
-            --method POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            /repos/${{ github.repository }}/pulls \
-            -f title="chore: update Kubebuilder scaffolding from ${{ env.PR_FROM_VERSION }} to ${{ env.PR_TO_VERSION }}" \
-            -f body="Automated Kubebuilder scaffolding update from ${{ env.PR_FROM_VERSION }} to ${{ env.PR_TO_VERSION }}. Please review the changes." \
-            -f head="kubebuilder-alpha-update" \
-            -f base="main"
+    
+      - name: Create issue for Kubebuilder scaffold update
+        if: ${{ env.PR_FROM_VERSION != 'unknown' && env.PR_TO_VERSION != 'unknown' && env.PR_FROM_VERSION != env.PR_TO_VERSION }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          title="Update Kubebuilder scaffold from $PR_FROM_VERSION to $PR_TO_VERSION"
+          
+          gh issue create \
+            --assignee "@copilot" \
+            --title "$title" \
+            --body "We should update Kubebuilder scaffold from $PR_FROM_VERSION to $PR_TO_VERSION."
