@@ -101,19 +101,6 @@ jobs:
           to v${{ steps.latest-version.outputs.latest_version }}
         body: "Automated update via workflow."
 
-    - name: Create fallback branch and commit
-      id: fb
-      if: steps.version-check.outputs.update_needed == 'true' && (steps.cpr.outcome == 'failure' || !steps.cpr.outputs.pull-request-url)
-      run: |
-        BR="${{ env.BRANCH_NAME }}"
-        git checkout "$BR"
-        git add -A
-        git commit -m "(chore) Update Kubebuilder scaffold \
-        from v${{ steps.current-version.outputs.current_version }} \
-        to v${{ steps.latest-version.outputs.latest_version }}"
-        git push -u origin "$BR"
-        echo "branch=$BR" >> $GITHUB_OUTPUT
-
     - name: Prepare issue body
       if: steps.version-check.outputs.update_needed == 'true' && (steps.cpr.outcome == 'failure' || !steps.cpr.outputs.pull-request-url)
       run: |
@@ -126,7 +113,7 @@ jobs:
         **Latest:** v${{ steps.latest-version.outputs.latest_version }}
 
         Open a PR manually from this branch:
-        https://github.com/${{ github.repository }}/pull/new/${{ steps.fb.outputs.branch }}
+        https://github.com/${{ github.repository }}/pull/new/${{ env.BRANCH_NAME }}
 
         _This issue was created by the Alpha Update workflow._
         EOF
