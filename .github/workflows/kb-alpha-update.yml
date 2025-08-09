@@ -1,219 +1,159 @@
 name: Alpha Update
 
 permissions:
-    contents: write
-    issues: write
+  contents: write
+  issues: write
+  pull-requests: write
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 0 * * 2" # Runs every Tuesday at 00:00 UTC (corrected from Monday)
+    - cron: "0 0 * * 2" # Every Tuesday at 00:00 UTC
 
 jobs:
-    alpha-update:
-      runs-on: ubuntu-latest
+  alpha-update:
+    runs-on: ubuntu-latest
+    env:
+      BRANCH_NAME: kubebuilder-alpha-update-${{ github.run_number }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: stable
+
+    - name: Install Kubebuilder
+      run: |
+        curl -L -o kubebuilder "https://go.kubebuilder.io/dl/latest/$(go env GOOS)/$(go env GOARCH)"
+        chmod +x kubebuilder
+        sudo mv kubebuilder /usr/local/bin/
+
+    - name: Configure Git
+      run: |
+        git config --local user.name "github-actions[bot]"
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+
+    - name: Extract current version
+      id: current-version
+      run: |
+        if [ -f "PROJECT" ]; then
+          current_version=$(grep "cliVersion:" PROJECT | awk '{print $2}' | sed 's/^v//')
+          echo "current_version=$current_version" >> $GITHUB_OUTPUT
+        else
+          echo "PROJECT file not found"
+          exit 1
+        fi
+
+    - name: Fetch latest version
+      id: latest-version
+      run: |
+        latest_version=$(curl -s https://api.github.com/repos/kubernetes-sigs/kubebuilder/releases/latest \
+          | jq -r '.tag_name' | sed 's/^v//')
+        echo "latest_version=$latest_version" >> $GITHUB_OUTPUT
+
+    - name: Compare versions
+      id: version-check
+      run: |
+        current="${{ steps.current-version.outputs.current_version }}"
+        latest="${{ steps.latest-version.outputs.latest_version }}"
+        if [ "$current" != "$latest" ]; then
+          echo "update_needed=true" >> $GITHUB_OUTPUT
+        else
+          echo "update_needed=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Run kubebuilder alpha update
+      if: steps.version-check.outputs.update_needed == 'true'
+      run: |
+        kubebuilder alpha update \
+        --from-version v${{ steps.current-version.outputs.current_version }} \
+        --to-version v${{ steps.latest-version.outputs.latest_version }} \
+        --force
+
+    - name: Restore workflows directory
+      if: steps.version-check.outputs.update_needed == 'true'
+      run: |
+        git restore --source=main --staged --worktree .github/workflows || true
+
+    - name: Soft reset last 4 commits and checkout main
+      if: steps.version-check.outputs.update_needed == 'true'
+      run: |
+        git reset --soft HEAD~4
+        git checkout main
+
+    - name: Create PR with peter-evans
+      id: cpr
+      if: steps.version-check.outputs.update_needed == 'true'
+      uses: peter-evans/create-pull-request@v7.0.8
+      continue-on-error: true
+      with:
+        branch: ${{ env.BRANCH_NAME }}
+        title: >
+          (chore) Update Kubebuilder scaffold 
+          from v${{ steps.current-version.outputs.current_version }}
+          to v${{ steps.latest-version.outputs.latest_version }}
+        body: "Automated update via workflow."
+
+    - name: Create fallback branch and commit
+      id: fb
+      if: steps.version-check.outputs.update_needed == 'true' && (steps.cpr.outcome == 'failure' || !steps.cpr.outputs.pull-request-url)
+      run: |
+        BR="${{ env.BRANCH_NAME }}"
+        git checkout -b "$BR"
+        git add -A
+        git commit -m "(chore) Update Kubebuilder scaffold \
+        from v${{ steps.current-version.outputs.current_version }} \
+        to v${{ steps.latest-version.outputs.latest_version }}"
+        git push -u origin "$BR"
+        echo "branch=$BR" >> $GITHUB_OUTPUT
+
+    - name: Prepare issue body
+      if: steps.version-check.outputs.update_needed == 'true' && (steps.cpr.outcome == 'failure' || !steps.cpr.outputs.pull-request-url)
+      run: |
+        cat > issue_body.md <<EOF
+        ## Kubebuilder update needed
+
+        Automated PR failed this run.
+
+        **Current:** v${{ steps.current-version.outputs.current_version }}
+        **Latest:** v${{ steps.latest-version.outputs.latest_version }}
+
+        Open a PR manually from this branch:
+        https://github.com/${{ github.repository }}/pull/new/${{ steps.fb.outputs.branch }}
+
+        _This issue was created by the Alpha Update workflow._
+        EOF
+
+    - name: Find existing update issue
+      id: find-issue
+      if: steps.version-check.outputs.update_needed == 'true' && (steps.cpr.outcome == 'failure' || !steps.cpr.outputs.pull-request-url)
+      run: |
+        num=$(gh issue list --state open --search "Update Kubebuilder" --json number,title \
+          | jq -r '.[] | select(.title | contains("Update Kubebuilder")) | .number' | head -1)
+        echo "number=$num" >> $GITHUB_OUTPUT
       env:
-        BRANCH_NAME: kubebuilder-alpha-update-${{ github.run_number }}
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0
+    - name: Create issue (fallback)
+      if: steps.version-check.outputs.update_needed == 'true' && (steps.cpr.outcome == 'failure' || !steps.cpr.outputs.pull-request-url) && steps.find-issue.outputs.number == ''
+      run: |
+        gh issue create \
+          --title "Update Kubebuilder from v${{ steps.current-version.outputs.current_version }} to v${{ steps.latest-version.outputs.latest_version }}" \
+          --body-file issue_body.md \
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: 'stable'
-
-      - name: Install Kubebuilder
-        run: |
-          curl -L -o kubebuilder "https://go.kubebuilder.io/dl/latest/$(go env GOOS)/$(go env GOARCH)"
-          chmod +x kubebuilder
-          sudo mv kubebuilder /usr/local/bin/
-      
-      - name: Configure Git
-        run: |
-          git config --local user.name "user"
-          git config --local user.email "user@users.noreply.github.com"
-
-      - name: Extract current version from cliVersion field in the PROJECT config file
-        id: current-version
-        run: |
-          if [ -f "PROJECT" ]; then
-            # Extract cliVersion from PROJECT file
-            current_version=$(grep "cliVersion:" PROJECT | awk '{print $2}')
-            
-            echo "current_version=$current_version" >> $GITHUB_OUTPUT
-            echo "Current Kubebuilder version: $current_version"
-          else
-            echo "PROJECT file not found"
-            exit 1
-          fi
-
-      - name: Fetch latest Kubebuilder version from GitHub releases
-        id: latest-version
-        run: |
-          # Get latest release version from GitHub API
-          latest_version=$(curl -s https://api.github.com/repos/kubernetes-sigs/kubebuilder/releases/latest | jq -r '.tag_name' | sed 's/^v//')
-          echo "latest_version=$latest_version" >> $GITHUB_OUTPUT
-          echo "Latest Kubebuilder version: $latest_version"
-
-      - name: Compare versions and create issue if update needed
-        id: version-check
-        run: |
-          current="${{ steps.current-version.outputs.current_version }}"
-          latest="${{ steps.latest-version.outputs.latest_version }}"
-          
-          echo "Comparing versions: $current vs $latest"
-          
-          if [ "$current" != "$latest" ]; then
-            echo "update_needed=true" >> $GITHUB_OUTPUT
-            echo "Update needed from $current to $latest"
-          else
-            echo "update_needed=false" >> $GITHUB_OUTPUT
-            echo "Already using latest version"
-          fi
-      
-      - name: Run kubebuilder alpha update
-        run: |
-          kubebuilder alpha update --from-version v4.5.2 --force
-
-      - name: Restore workflows directory
-        run: |
-          git restore --source=main --staged --worktree .github/workflows
-          git add .github/workflows
-          git commit --amend --no-edit 
-            
-      - name: Soft reset last 4 commits and checkout main
-        run: |
-          git reset --soft HEAD~4
-          git checkout -b ${{ env.BRANCH_NAME }}
-          git add .
-          git commit -m "Kubebuilder alpha update"
-          git push -u origin ${{ env.BRANCH_NAME }}
-
-      - name: Prepare issue content
-        id: prepare-issue
-        if: steps.version-check.outputs.update_needed == 'true'
-        run: |
-          current_version="${{ steps.current-version.outputs.current_version }}"
-          latest_version="${{ steps.latest-version.outputs.latest_version }}"
-          
-          # Set issue title
-          issue_title="Update Kubebuilder from v$current_version to v$latest_version"
-          echo "issue_title=$issue_title" >> $GITHUB_OUTPUT
-          
-          # Create issue body
-          cat > issue_body.md << EOF
-          ## Kubebuilder Version Update Available
-          
-          A new version of Kubebuilder is available for update.
-          
-          ### Version Information
-          - **Current Version**: v$current_version
-          - **Latest Version**: v$latest_version
-          
-          ### Update Steps
-          
-          #### 1. Install Latest Kubebuilder
-          
-          Choose one of the following methods to install Kubebuilder v$latest_version:
-          
-          **Option A: Using go install (recommended)**
-          \`\`\`bash
-          go install sigs.k8s.io/kubebuilder/cmd/kubebuilder@v$latest_version
-          \`\`\`
-          
-          **Option B: Download release binary**
-          \`\`\`bash
-          # For Linux amd64
-          curl -L -o kubebuilder https://github.com/kubernetes-sigs/kubebuilder/releases/download/v$latest_version/kubebuilder_linux_amd64
-          chmod +x kubebuilder
-          sudo mv kubebuilder /usr/local/bin/
-          \`\`\`
-          
-          **Option C: Build from source**
-          \`\`\`bash
-          git clone https://github.com/kubernetes-sigs/kubebuilder.git
-          cd kubebuilder
-          git checkout v$latest_version
-          make build
-          sudo mv bin/kubebuilder /usr/local/bin/
-          \`\`\`
-          
-          #### 2. Verify Installation
-          \`\`\`bash
-          kubebuilder version
-          \`\`\`
-          
-          #### 3. Run Alpha Update Command
-          Navigate to your project root directory and run:
-          \`\`\`bash
-          kubebuilder alpha update
-          \`\`\`
-          
-          Or create a PR with the changes: https://github.com/${{ github.repository }}/pull/new/${{ env.BRANCH_NAME }}
-
-          This command will update the project by performing a three-way git merge.
-          
-          ### Important Notes
-          - Review all changes carefully before committing
-          - Test your operator after the update to ensure compatibility
-          
-          ### Documentation
-          - [Kubebuilder Alpha Update Documentation](https://book.kubebuilder.io/reference/commands/alpha_update)
-          
-          ### Release Notes
-          Check the [Kubebuilder releases page](https://github.com/kubernetes-sigs/kubebuilder/releases/tag/v$latest_version) for detailed release notes and breaking changes.
-          
-          ---
-          *This issue was automatically created by the Alpha Update workflow.*
-          EOF
-          
-          echo "Issue content prepared"
-
-      - name: Check if issue already exists
-        id: check-issue
-        if: steps.version-check.outputs.update_needed == 'true'
-        run: |
-          # Check if an issue with similar title already exists
-          existing_issue=$(gh issue list --search "Update Kubebuilder" --state open --json number,title | jq -r '.[] | select(.title | contains("Update Kubebuilder")) | .number' | head -1)
-          
-          if [ -n "$existing_issue" ]; then
-            echo "issue_exists=true" >> $GITHUB_OUTPUT
-            echo "existing_issue_number=$existing_issue" >> $GITHUB_OUTPUT
-            echo "Issue already exists: #$existing_issue"
-          else
-            echo "issue_exists=false" >> $GITHUB_OUTPUT
-            echo "No existing issue found"
-          fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Create issue for updating from current version to latest release
-        if: steps.version-check.outputs.update_needed == 'true' && steps.check-issue.outputs.issue_exists == 'false'
-        run: |
-          # Create the issue using prepared content
-          gh issue create \
-            --title "${{ steps.prepare-issue.outputs.issue_title }}" \
-            --body-file issue_body.md
-          
-          echo "Issue created successfully"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Update existing issue if version changed
-        if: steps.version-check.outputs.update_needed == 'true' && steps.check-issue.outputs.issue_exists == 'true'
-        run: |
-          issue_number="${{ steps.check-issue.outputs.existing_issue_number }}"
-          
-          # Update the issue title and body using prepared content
-          gh issue edit $issue_number \
-            --title "${{ steps.prepare-issue.outputs.issue_title }}" \
-            --body-file issue_body.md
-          
-          echo "Updated existing issue #$issue_number with new title and description"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Update existing issue (fallback)
+      if: steps.version-check.outputs.update_needed == 'true' && (steps.cpr.outcome == 'failure' || !steps.cpr.outputs.pull-request-url) && steps.find-issue.outputs.number != ''
+      run: |
+        gh issue edit ${{ steps.find-issue.outputs.number }} \
+          --title "Update Kubebuilder from v${{ steps.current-version.outputs.current_version }} to v${{ steps.latest-version.outputs.latest_version }}" \
+          --body-file issue_body.md
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
