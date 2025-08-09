@@ -34,11 +34,6 @@ jobs:
         chmod +x kubebuilder
         sudo mv kubebuilder /usr/local/bin/
 
-    - name: Configure Git
-      run: |
-        git config --local user.name "github-actions[bot]"
-        git config --local user.email "github-actions[bot]@users.noreply.github.com"
-
     - name: Extract current version
       id: current-version
       run: |
@@ -68,6 +63,10 @@ jobs:
           echo "update_needed=false" >> $GITHUB_OUTPUT
         fi
 
+    - name: Save base commit
+      id: base
+      run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
     - name: Run kubebuilder alpha update
       if: steps.version-check.outputs.update_needed == 'true'
       run: |
@@ -79,12 +78,13 @@ jobs:
     - name: Restore workflows directory
       if: steps.version-check.outputs.update_needed == 'true'
       run: |
-        git restore --source=main --staged --worktree .github/workflows || true
+        git restore --source=${{ steps.base.outputs.sha }} \
+        --staged --worktree .github/workflows || true
 
     - name: Soft reset last 4 commits and checkout main
       if: steps.version-check.outputs.update_needed == 'true'
       run: |
-        git reset --soft HEAD~4
+        git reset --soft ${{ steps.base.outputs.sha }}
         git add -A
         git checkout main
 
