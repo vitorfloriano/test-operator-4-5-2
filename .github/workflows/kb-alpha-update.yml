@@ -39,6 +39,7 @@ jobs:
           exit 1
         fi
 
+        echo "Current Kubebuilder version: v$current_version"
         echo "current_version=$current_version" >> $GITHUB_OUTPUT
 
     - name: Fetch latest version
@@ -47,6 +48,7 @@ jobs:
         GH_TOKEN: ${{ github.token }}
       run: |
         latest_version=$(gh api repos/kubernetes-sigs/kubebuilder/releases/latest -q .tag_name | sed 's/^v//')
+        echo "Latest Kubebuilder version: v$latest_version"
         echo "latest_version=$latest_version" >> $GITHUB_OUTPUT
 
     - name: Compare versions
@@ -55,8 +57,10 @@ jobs:
         current="${{ steps.current-version.outputs.current_version }}"
         latest="${{ steps.latest-version.outputs.latest_version }}"
         if [ "$current" != "$latest" ]; then
+          echo "Update needed - versions differ"
           echo "update_needed=true" >> $GITHUB_OUTPUT
         else
+          echo "No update needed - versions are the same"
           echo "update_needed=false" >> $GITHUB_OUTPUT
         fi
 
@@ -71,6 +75,8 @@ jobs:
           "https://github.com/kubernetes-sigs/kubebuilder/releases/download/v${{ steps.latest-version.outputs.latest_version }}/kubebuilder_$(go env GOOS)_$(go env GOARCH)"
         chmod +x kubebuilder
         sudo mv kubebuilder /usr/local/bin/
+        echo "Kubebuilder installed successfully"
+        kubebuilder version
 
     - name: Save base commit
       id: base
@@ -79,6 +85,9 @@ jobs:
     - name: Run kubebuilder alpha update
       if: steps.version-check.outputs.update_needed == 'true'
       run: |
+        echo "Running kubebuilder alpha update"
+        echo "From version v${{ steps.current-version.outputs.current_version }}"
+        echo "To version v${{ steps.latest-version.outputs.latest_version }}"
         kubebuilder alpha update \
         --from-version v${{ steps.current-version.outputs.current_version }} \
         --to-version v${{ steps.latest-version.outputs.latest_version }} \
