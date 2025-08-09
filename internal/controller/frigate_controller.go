@@ -50,7 +50,7 @@ type FrigateReconciler struct {
 func (r *FrigateReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.FromContext(ctx)
 
-	frigate := &examplecomv1.Frigate{}
+	frigate := &shipv1beta1.Frigate{}
 	err := r.Get(ctx, req.NamespacedName, frigate)
 	if err != nil {
 		if errors.IsNotFound(err) {
