@@ -85,6 +85,7 @@ jobs:
       if: steps.version-check.outputs.update_needed == 'true'
       run: |
         git reset --soft HEAD~4
+        git add -A
         git checkout main
 
     - name: Create PR with peter-evans
