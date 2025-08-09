@@ -23,33 +23,28 @@ jobs:
         token: ${{ secrets.GITHUB_TOKEN }}
         fetch-depth: 0
 
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: stable
-
-    - name: Install Kubebuilder
-      run: |
-        curl -L -o kubebuilder "https://go.kubebuilder.io/dl/latest/$(go env GOOS)/$(go env GOARCH)"
-        chmod +x kubebuilder
-        sudo mv kubebuilder /usr/local/bin/
-
     - name: Extract current version
       id: current-version
       run: |
-        if [ -f "PROJECT" ]; then
-          current_version=$(grep "cliVersion:" PROJECT | awk '{print $2}' | sed 's/^v//')
-          echo "current_version=$current_version" >> $GITHUB_OUTPUT
-        else
+        if [ ! -f "PROJECT" ]; then
           echo "PROJECT file not found"
           exit 1
         fi
 
+        cliversion=$(grep -Eo 'cliVersion:\s*v?[0-9]+\.[0-9]+\.[0-9]+' PROJECT)
+        current_version=$(echo "$cliversion" | awk '{print $2}' | sed 's/^v//')
+
+        if [ -z "$current_version" ]; then
+          echo "cliVersion not found or invalid in PROJECT"
+          exit 1
+        fi
+
+        echo "current_version=$current_version" >> $GITHUB_OUTPUT
+
     - name: Fetch latest version
       id: latest-version
       run: |
-        latest_version=$(curl -s https://api.github.com/repos/kubernetes-sigs/kubebuilder/releases/latest \
-          | jq -r '.tag_name' | sed 's/^v//')
+        latest_version=$(gh api repos/kubernetes-sigs/kubebuilder/releases/latest -q .tag_name | sed 's/^v//')
         echo "latest_version=$latest_version" >> $GITHUB_OUTPUT
 
     - name: Compare versions
@@ -62,6 +57,18 @@ jobs:
         else
           echo "update_needed=false" >> $GITHUB_OUTPUT
         fi
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: stable
+
+    - name: Install Kubebuilder
+      run: |
+        curl -L -o kubebuilder \
+        "https://go.kubebuilder.io/dl/v${{ steps.latest-version.outputs.latest_version }}/$(go env GOOS)/$(go env GOARCH)"
+        chmod +x kubebuilder
+        sudo mv kubebuilder /usr/local/bin/
 
     - name: Save base commit
       id: base
@@ -81,12 +88,11 @@ jobs:
         git restore --source=${{ steps.base.outputs.sha }} \
         --staged --worktree .github/workflows || true
 
-    - name: Soft reset last 4 commits and checkout main
+    - name: Soft reset to base and checkout main at base commit
       if: steps.version-check.outputs.update_needed == 'true'
       run: |
         git reset --soft ${{ steps.base.outputs.sha }}
-        git add -A
-        git checkout main
+        git checkout -B main ${{ steps.base.outputs.sha }}
 
     - name: Create PR with peter-evans
       id: cpr
@@ -95,6 +101,10 @@ jobs:
       continue-on-error: true
       with:
         branch: ${{ env.BRANCH_NAME }}
+        commit-message: |
+          (chore) update Kubebuilder scaffold from v${{ steps.current-version.outputs.current_version }} to v${{ steps.latest-version.outputs.latest_version }}
+
+          Automated update via workflow.
         title: >
           (chore) Update Kubebuilder scaffold 
           from v${{ steps.current-version.outputs.current_version }}
@@ -133,7 +143,7 @@ jobs:
       run: |
         gh issue create \
           --title "Update Kubebuilder from v${{ steps.current-version.outputs.current_version }} to v${{ steps.latest-version.outputs.latest_version }}" \
-          --body-file issue_body.md \
+          --body-file issue_body.md
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
