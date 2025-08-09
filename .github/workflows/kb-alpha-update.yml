@@ -106,7 +106,7 @@ jobs:
       if: steps.version-check.outputs.update_needed == 'true' && (steps.cpr.outcome == 'failure' || !steps.cpr.outputs.pull-request-url)
       run: |
         BR="${{ env.BRANCH_NAME }}"
-        git checkout -b "$BR"
+        git checkout "$BR"
         git add -A
         git commit -m "(chore) Update Kubebuilder scaffold \
         from v${{ steps.current-version.outputs.current_version }} \
