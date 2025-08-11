@@ -98,22 +98,22 @@ jobs:
         --preserve-path .github/workflows \
         --force
 
-    - name: Create PR with peter-evans
+    - name: Create PR with gh cli
       id: cpr
       if: steps.version-check.outputs.update_needed == 'true'
-      uses: peter-evans/create-pull-request@v7.0.8
       continue-on-error: true
-      with:
-        branch: ${{ env.BRANCH_NAME }}
-        commit-message: |
-          (chore) update Kubebuilder scaffold from v${{ steps.current-version.outputs.current_version }} to v${{ steps.latest-version.outputs.latest_version }}
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        
+        git push
 
-          Automated update via workflow.
-        title: >
-          (chore) Update Kubebuilder scaffold 
-          from v${{ steps.current-version.outputs.current_version }}
-          to v${{ steps.latest-version.outputs.latest_version }}
-        body: "Automated update via workflow."
+        gh pr create \
+          --title "(chore) Update Kubebuilder scaffold from v${{ steps.current-version.outputs.current_version }} to v${{ steps.latest-version.outputs.latest_version }}" \
+          --body "Automated update via workflow." \
+          --base main
 
     - name: Prepare issue body
       if: steps.version-check.outputs.update_needed == 'true' && (steps.cpr.outcome == 'failure' || !steps.cpr.outputs.pull-request-url)
