@@ -71,12 +71,15 @@ jobs:
 
     - name: Install Kubebuilder
       run: |
-        curl -L -o kubebuilder \
-          "https://github.com/kubernetes-sigs/kubebuilder/releases/download/v${{ steps.latest-version.outputs.latest_version }}/kubebuilder_$(go env GOOS)_$(go env GOARCH)"
-        chmod +x kubebuilder
-        sudo mv kubebuilder /usr/local/bin/
-        echo "Kubebuilder installed successfully"
+        echo "Building Kubebuilder from source (master branch)..."
+        git clone --depth 1 --branch master \
+          https://github.com/kubernetes-sigs/kubebuilder.git /tmp/kubebuilder
+        cd /tmp/kubebuilder
+        make build
+        sudo cp bin/kubebuilder /usr/local/bin/
+        echo "Kubebuilder built and installed successfully"
         kubebuilder version
+        rm -rf /tmp/kubebuilder
 
     - name: Save base commit
       id: base
@@ -91,19 +94,9 @@ jobs:
         kubebuilder alpha update \
         --from-version v${{ steps.current-version.outputs.current_version }} \
         --to-version v${{ steps.latest-version.outputs.latest_version }} \
+        --squash \
+        --preserve-path .github/workflows \
         --force
-
-    - name: Restore workflows directory
-      if: steps.version-check.outputs.update_needed == 'true'
-      run: |
-        git restore --source=${{ steps.base.outputs.sha }} \
-        --staged --worktree .github/workflows || true
-
-    - name: Soft reset to base and checkout main at base commit
-      if: steps.version-check.outputs.update_needed == 'true'
-      run: |
-        git reset --soft ${{ steps.base.outputs.sha }}
-        git checkout -B main ${{ steps.base.outputs.sha }}
 
     - name: Create PR with peter-evans
       id: cpr
