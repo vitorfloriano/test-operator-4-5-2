@@ -43,8 +43,8 @@ jobs:
     - name: Run kubebuilder alpha update
       run: |
         kubebuilder alpha update \
-        --squash \
-        --preserve-path .github/workflows \
-        --force \
-        --open-pr \
-        --open-issue
+          --force \
+          --squash \
+          --preserve-path .github/workflows \
+          --open-pr \
+          --open-issue
