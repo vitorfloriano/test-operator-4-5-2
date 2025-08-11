@@ -41,7 +41,6 @@ jobs:
         rm -rf /tmp/kubebuilder
 
     - name: Run kubebuilder alpha update
-      if: steps.version-check.outputs.update_needed == 'true'
       run: |
         kubebuilder alpha update \
         --squash \
@@ -50,7 +49,6 @@ jobs:
 
     - name: Create PR with gh cli
       id: cpr
-      if: steps.version-check.outputs.update_needed == 'true'
       continue-on-error: true
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -66,7 +64,6 @@ jobs:
           --base main
 
     - name: Prepare issue body
-      if: steps.version-check.outputs.update_needed == 'true' && (steps.cpr.outcome == 'failure' || !steps.cpr.outputs.pull-request-url)
       run: |
         cat > issue_body.md <<EOF
         ## Kubebuilder update needed
@@ -78,7 +75,7 @@ jobs:
 
     - name: Find existing update issue
       id: find-issue
-      if: steps.version-check.outputs.update_needed == 'true' && (steps.cpr.outcome == 'failure' || !steps.cpr.outputs.pull-request-url)
+      if: steps.cpr.outcome == 'failure'
       run: |
         num=$(gh issue list --state open --search "Update Kubebuilder" --json number,title \
           | jq -r '.[] | select(.title | contains("Update Kubebuilder")) | .number' | head -1)
@@ -87,7 +84,7 @@ jobs:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Create issue (fallback)
-      if: steps.version-check.outputs.update_needed == 'true' && (steps.cpr.outcome == 'failure' || !steps.cpr.outputs.pull-request-url) && steps.find-issue.outputs.number == ''
+      if: steps.cpr.outcome == 'failure' && steps.find-issue.outputs.number == ''
       run: |
         gh issue create \
           --title "Update Kubebuilder " \
@@ -96,7 +93,7 @@ jobs:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Update existing issue (fallback)
-      if: steps.version-check.outputs.update_needed == 'true' && (steps.cpr.outcome == 'failure' || !steps.cpr.outputs.pull-request-url) && steps.find-issue.outputs.number != ''
+      if: steps.cpr.outcome == 'failure' && steps.find-issue.outputs.number != ''
       run: |
         gh issue edit ${{ steps.find-issue.outputs.number }} \
           --title "Update Kubebuilder from" \
