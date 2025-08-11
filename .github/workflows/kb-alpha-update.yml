@@ -40,11 +40,34 @@ jobs:
         kubebuilder version
         rm -rf /tmp/kubebuilder
 
-    - name: Run kubebuilder alpha update
+    - name: 🔍 Debug GitHub CLI Issues
+      if: failure()
       run: |
-        kubebuilder alpha update \
-          --force \
-          --squash \
-          --preserve-path .github/workflows \
-          --open-pr \
-          --open-issue
+        echo "🔍 Debugging GitHub CLI issues..."
+
+        # Check environment
+        echo "Environment variables:"
+        env | grep -E "(GITHUB|GH)_" | sort
+
+        # Check gh CLI status
+        echo "GitHub CLI status:"
+        gh auth status -t 2>&1 || echo "Auth status failed"
+
+        # Test basic operations
+        echo "Testing basic gh operations:"
+        gh repo view --json name,owner || echo "Repo view failed"
+        gh api user --jq '.login' || echo "API test failed"
+
+        # Check git status
+        echo "Git status:"
+        git status
+        git branch -a | head -10
+
+        # Check if branch exists
+        UPDATE_BRANCH=$(git branch | grep kubebuilder-update | head -1 | tr -d ' *' || echo "")
+        if [[ -n "$UPDATE_BRANCH" ]]; then
+          echo "Update branch found: $UPDATE_BRANCH"
+          git log -1 --oneline "$UPDATE_BRANCH"
+        else
+          echo "No update branch found"
+        fi
