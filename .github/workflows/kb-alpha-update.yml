@@ -40,6 +40,15 @@ jobs:
         kubebuilder version
         rm -rf /tmp/kubebuilder
 
+    - name: Run kubebuilder alpha update
+      run: |
+        kubebuilder alpha update \
+          --force \
+          --squash \
+          --preserve-path .github/workflows \
+          --open-pr \
+          --open-issue
+
     - name: 🔍 Debug GitHub CLI Issues
       if: failure()
       run: |
