@@ -56,11 +56,12 @@ jobs:
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
         
-        git push
+        git push -u ${{ env.BRANCH_NAME }}
 
         gh pr create \
           --title "(chore) Update Kubebuilder scaffold" \
           --body "Automated update via workflow." \
+          --head ${{ env.BRANCH_NAME }} \ 
           --base main
 
     - name: Prepare issue body
