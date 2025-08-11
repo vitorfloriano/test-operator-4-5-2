@@ -30,9 +30,9 @@ jobs:
 
     - name: Install Kubebuilder
       run: |
-        echo "Building Kubebuilder from source (master branch)..."
-        git clone --depth 1 --branch master \
-          https://github.com/kubernetes-sigs/kubebuilder.git /tmp/kubebuilder
+        echo "Building Kubebuilder from fork (open-pr-issue-flags)..."
+        git clone --depth 1 --branch open-pr-issue-flags \
+          https://github.com/vitorfloriano/kubebuilder.git /tmp/kubebuilder
         cd /tmp/kubebuilder
         make build
         sudo cp bin/kubebuilder /usr/local/bin/
@@ -45,60 +45,6 @@ jobs:
         kubebuilder alpha update \
         --squash \
         --preserve-path .github/workflows \
-        --force
-
-    - name: Create PR with gh cli
-      id: cpr
-      continue-on-error: true
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
-        
-        git checkout -b ${{ env.BRANCH_NAME }}
-        git push -u origin ${{ env.BRANCH_NAME }}
-
-        gh pr create \
-              --title "(chore) Update Kubebuilder scaffold" \
-              --body "Automated update via workflow." \
-              --head "${{ env.BRANCH_NAME }}" \
-              --base main
-
-    - name: Prepare issue body
-      run: |
-        cat > issue_body.md <<EOF
-        ## Kubebuilder update needed
-
-        Automated PR failed this run.
-
-        _This issue was created by the Alpha Update workflow._
-        EOF
-
-    - name: Find existing update issue
-      id: find-issue
-      if: steps.cpr.outcome == 'failure'
-      run: |
-        num=$(gh issue list --state open --search "Update Kubebuilder" --json number,title \
-          | jq -r '.[] | select(.title | contains("Update Kubebuilder")) | .number' | head -1)
-        echo "number=$num" >> $GITHUB_OUTPUT
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Create issue (fallback)
-      if: steps.cpr.outcome == 'failure' && steps.find-issue.outputs.number == ''
-      run: |
-        gh issue create \
-          --title "Update Kubebuilder " \
-          --body-file issue_body.md
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Update existing issue (fallback)
-      if: steps.cpr.outcome == 'failure' && steps.find-issue.outputs.number != ''
-      run: |
-        gh issue edit ${{ steps.find-issue.outputs.number }} \
-          --title "Update Kubebuilder from" \
-          --body-file issue_body.md
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        --force \
+        --open-pr \
+        --open-issue
