@@ -47,10 +47,10 @@ jobs:
           --squash \
           --preserve-path .github/workflows \
           --open-pr \
-          --open-issue
+          --open-issue \
+          --debug
 
     - name: 🔍 Debug GitHub CLI Issues
-      if: failure()
       run: |
         echo "🔍 Debugging GitHub CLI issues..."
 
