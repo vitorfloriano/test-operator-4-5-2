@@ -47,8 +47,7 @@ jobs:
           --squash \
           --preserve-path .github/workflows \
           --open-pr \
-          --open-issue \
-          --debug
+          --open-issue
 
     - name: 🔍 Debug GitHub CLI Issues
       run: |
